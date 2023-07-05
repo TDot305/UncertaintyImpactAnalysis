@@ -1,4 +1,4 @@
-package dev.abunai.impact.analysis.tests;
+package rest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

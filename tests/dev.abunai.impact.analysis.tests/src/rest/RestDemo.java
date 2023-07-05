@@ -1,4 +1,4 @@
-package dev.abunai.impact.analysis.tests;
+package rest;
 
 import static spark.Spark.*;
 
