@@ -2,19 +2,27 @@ package rest;
 
 import static spark.Spark.*;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Set;
 
 import javax.servlet.MultipartConfigElement;
 
-public class RestDemo {
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class RestConnector {
 
 	private static final String SERVICE_PATH = "/abunai";
+	
+	public static record AnalysisParameter(String modelPath, Set<Assumption> assumptions) {
+    }
 
 	public static void main(String[] args) {
-		System.out.println("Doing a thing!");
-
+		var abunaiAdapter = new AbunaiAdapter();
+		var objectMapper = new ObjectMapper();
+		
 		port(2406);
 		get(SERVICE_PATH + "/test", (req, res) -> {
 			res.status(200);
@@ -25,10 +33,20 @@ public class RestDemo {
 		post(SERVICE_PATH + "/run", (req, res) -> {
 			System.out.println(req.body());
 			
-			var analysis = new StandAloneAnalysis();
+			//var analysis = new StandAloneAnalysis();
+			//return res.status(200);
+			//return analysis.execute();
 			
+			
+			abunaiAdapter.setAssumptions(objectMapper.readValue(req.body(), AnalysisParameter.class).assumptions());
+			abunaiAdapter.setBaseFolderName("casestudies/CaseStudy-CoronaWarnApp");
+			abunaiAdapter.setFilesName("default");
+			abunaiAdapter.setFolderName("CoronaWarnApp");
+			abunaiAdapter.setScenarioName("Scenario 1");
 			res.status(200);
-			return analysis.execute();
+			String anaylsisOutput = abunaiAdapter.executeAnalysis();
+			System.out.println("Output:\n" + anaylsisOutput);
+			return anaylsisOutput;
 		});
 		
 		post(SERVICE_PATH + "/set/model", (req, res) -> {
@@ -48,9 +66,6 @@ public class RestDemo {
 			
 			var body = req.body();
 			res.status(200);
-			
-			
-			
 			
 			return "Sucess!";
 		});

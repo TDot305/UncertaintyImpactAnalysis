@@ -10,6 +10,9 @@ import java.util.function.BiPredicate;
 import org.palladiosimulator.dataflow.confidentiality.analysis.builder.DataFlowAnalysisBuilder;
 import org.palladiosimulator.dataflow.confidentiality.analysis.builder.pcm.PCMDataFlowConfidentialityAnalysisBuilder;
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.pcm.PCMActionSequence;
+import org.palladiosimulator.dataflow.confidentiality.analysis.resource.ResourceLoader;
+import org.palladiosimulator.pcm.repository.Repository;
+import org.palladiosimulator.pcm.repository.RepositoryPackage;
 
 import dev.abunai.impact.analysis.PCMUncertaintyImpactAnalysisBuilder;
 import dev.abunai.impact.analysis.StandalonePCMUncertaintyImpactAnalysis;
@@ -23,8 +26,7 @@ public class StandAloneAnalysis {
 	
 	public static void main(String[] args) {
 		var test = new StandAloneAnalysis();
-		test.setup();
-		test.evaluateScenario();
+		System.out.println(test.execute());
 	}
 	
 	public String execute() {
@@ -35,6 +37,19 @@ public class StandAloneAnalysis {
 			System.setOut(printStream);
 			
 			this.setup();
+			
+			// Testing purposes:
+			var id = "_itmPILN2Ee2o46d27a6tVQ";
+			var test = this.analysis.getPropagationHelper().findResourceContainer(id);
+			if(test.isPresent()) {
+				System.out.println("<!> ----- I found the resource container with ID " + id + ":");
+				System.out.println(test.get());
+			} else {
+				System.out.println("<!> ----- I did not find something!");
+
+			}
+			
+			
 			this.evaluateScenario();
 			
 			System.out.flush();
@@ -81,8 +96,10 @@ public class StandAloneAnalysis {
 				.get(getBaseFolder(), getFolderName(), getFilesName() + ".nodecharacteristics").toString();
 		
 		var analysis = new DataFlowAnalysisBuilder().standalone().modelProjectName(TEST_MODEL_PROJECT_NAME)
-				.useBuilder(new PCMDataFlowConfidentialityAnalysisBuilder()).usePluginActivator(Activator.class)
-				.useUsageModel(usageModelPath).useAllocationModel(allocationPath)
+				.useBuilder(new PCMDataFlowConfidentialityAnalysisBuilder())
+				.usePluginActivator(Activator.class)
+				.useUsageModel(usageModelPath)
+				.useAllocationModel(allocationPath)
 				.useNodeCharacteristicsModel(nodeCharacteristicsPath)
 				.useBuilder(new PCMUncertaintyImpactAnalysisBuilder()).build();
 

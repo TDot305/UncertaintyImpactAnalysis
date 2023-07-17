@@ -1,23 +1,38 @@
 package rest;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class Assumption {
+public class Assumption implements Cloneable{
+    public static class AssumptionComparator implements Comparator<Assumption>{
+        @Override
+        public int compare(Assumption a1, Assumption a2) {
+            return a1.id.compareTo(a2.id);
+        }
+    }
     public enum AssumptionType {
-        INTRODUCE_UNCERTAINTY, RESOLVE_UNCERTAINTY
+        INTRODUCE_UNCERTAINTY, RESOLVE_UNCERTAINTY;
+
+        @Override
+        public String toString() {
+            if(this == INTRODUCE_UNCERTAINTY){
+                return "Introduce Uncertainty";
+            } else {
+                return "Resolve Uncertainty";
+            }
+        }
     }
 
     private UUID id;
-    private Set<UUID> dependencies;
-    private String affectedEntity;
     private AssumptionType type;
+    private Set<String> affectedEntities; // TODO Integrate associated functionality into UI.
+    private Set<UUID> dependencies;
     private String description;
     private Double probabilityOfViolation;
     private Double risk;
     private String impact;
-
     private Boolean analyzed;
 
     public Assumption() {
@@ -27,21 +42,12 @@ public class Assumption {
     public Assumption(UUID id) {
         this.id = id;
         this.dependencies = new HashSet<>();
+        this.affectedEntities = new HashSet<>();
         // Implicitly set all other fields to null.
     }
 
-    public Assumption(AssumptionType type, String description, double probabilityOfViolation, double risk, String impact, boolean analyzed) {
-        this();
-        this.type = type;
-        this.description = description;
-        this.probabilityOfViolation = probabilityOfViolation;
-        this.risk = risk;
-        this.impact = impact;
-        this.analyzed = analyzed;
-    }
-
-    public void setAffectedEntity(String affectedEntity) {
-        this.affectedEntity = affectedEntity;
+    public void setAffectedEntities(Set<String> affectedEntities) {
+        this.affectedEntities = affectedEntities;
     }
 
     public void setDependencies(Set<UUID> dependencies) {
@@ -76,8 +82,8 @@ public class Assumption {
         return this.id;
     }
 
-    public String getAffectedEntity() {
-        return this.affectedEntity;
+    public Set<String> getAffectedEntities() {
+        return this.affectedEntities;
     }
 
     public Set<UUID> getDependencies() {
@@ -109,7 +115,8 @@ public class Assumption {
     }
 
     public boolean isFullySpecified() {
-        return this.affectedEntity != null &&
+        return this.affectedEntities != null &&
+                !this.affectedEntities.isEmpty() &&
                 this.type != null &&
                 this.description != null &&
                 this.probabilityOfViolation != null &&
@@ -122,16 +129,36 @@ public class Assumption {
 
     @Override
     public String toString() {
-        return "Assumption{" +
-                "id=" + id +
+        return "id=" + id +
                 ", description='" + description + '\'' +
-                ", affectedComponent='" + affectedEntity + '\'' +
+                ", affectedComponent='" + affectedEntities + '\'' +
                 ", type=" + type +
                 ", dependencies=" + dependencies +
                 ", probabilityOfViolation=" + probabilityOfViolation +
                 ", risk=" + risk +
                 ", impact='" + impact + '\'' +
-                ", analyzed=" + analyzed +
-                '}';
+                ", analyzed=" + analyzed;
+    }
+
+    @Override
+    public Assumption clone() {
+        try {
+            Assumption clone = (Assumption) super.clone();
+
+            // UUID, String and primitive wrapper instances are immutable.
+            clone.id = this.id;
+            clone.dependencies = new HashSet<>(this.dependencies);
+            clone.affectedEntities = new HashSet<>(this.affectedEntities);
+            clone.type = this.type;
+            clone.description = this.description;
+            clone.probabilityOfViolation = this.probabilityOfViolation;
+            clone.risk = this.risk;
+            clone.impact = this.impact;
+            clone.analyzed = this.analyzed;
+
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError();
+        }
     }
 }
