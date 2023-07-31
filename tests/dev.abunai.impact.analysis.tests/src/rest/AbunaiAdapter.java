@@ -128,30 +128,29 @@ public class AbunaiAdapter {
 		var uncertaintySources = this.analysis.getUncertaintySources();
 		
 		for(var assumption : this.assumptions){
-			for(var affectedEntity : assumption.getAffectedEntities()){
-				if(propagationHelper.findAssemblyContext(affectedEntity).isPresent()) {
-					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntity);
-				} else if(propagationHelper.findResourceContainer(affectedEntity).isPresent()) {
-					uncertaintySources.addActorUncertaintyInResourceContainer(affectedEntity);
-				} else if(propagationHelper.findUsageScenario(affectedEntity).isPresent()) {
-					uncertaintySources.addActorUncertaintyInUsageScenario(affectedEntity);
-				} else if(propagationHelper.findSignature(affectedEntity).isPresent()) {
-					uncertaintySources.addInterfaceUncertaintyInSignature(affectedEntity);
-				} else if(propagationHelper.findInterface(affectedEntity).isPresent()) {
-					uncertaintySources.addInterfaceUncertaintyInInterface(affectedEntity);
-				} else if(propagationHelper.findConnector(affectedEntity).isPresent()) {
-					uncertaintySources.addConnectorUncertaintyInConnector(affectedEntity);
+			for(var affectedEntityID : assumption.getAffectedEntities().stream().map(modelEntity -> modelEntity.id()).toList()){
+				if(propagationHelper.findAssemblyContext(affectedEntityID).isPresent()) {
+					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
+				} else if(propagationHelper.findResourceContainer(affectedEntityID).isPresent()) {
+					uncertaintySources.addActorUncertaintyInResourceContainer(affectedEntityID);
+				} else if(propagationHelper.findUsageScenario(affectedEntityID).isPresent()) {
+					uncertaintySources.addActorUncertaintyInUsageScenario(affectedEntityID);
+				} else if(propagationHelper.findSignature(affectedEntityID).isPresent()) {
+					uncertaintySources.addInterfaceUncertaintyInSignature(affectedEntityID);
+				} else if(propagationHelper.findInterface(affectedEntityID).isPresent()) {
+					uncertaintySources.addInterfaceUncertaintyInInterface(affectedEntityID);
+				} else if(propagationHelper.findConnector(affectedEntityID).isPresent()) {
+					uncertaintySources.addConnectorUncertaintyInConnector(affectedEntityID);
 				} else {
-					/* TODO Problem cases:
+					/* TODO: Remaining cases that still need handling but have no support regarding the PropagationHelper:
 						[] addBehaviorUncertaintyInEntryLevelSystemCall
 						[] addBehaviorUncertaintyInExternalCallAction
 						[] addBehaviorUncertaintyInSetVariableAction
-						[X] addBehaviorUncertaintyInBranch
 						[] addBehaviorUncertainty
 					 */
 					
-					if(!propagationHelper.findStartActionsOfBranchAction(affectedEntity).isEmpty()) {
-						uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntity);
+					if(!propagationHelper.findStartActionsOfBranchAction(affectedEntityID).isEmpty()) {
+						uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntityID);
 					}
 					
 				}
@@ -160,6 +159,10 @@ public class AbunaiAdapter {
 	}
 	
 	private BiPredicate<List<String>, List<String>> getConstraint(){
+		/*
+		 * TODO: Evaluate how to generalize implementation (if necessary).
+		 * Current implementation is just copied from EvaluationScenario1.java for testing purposes. 
+		 * */
 		return (List<String> dataLiterals, List<String> nodeLiterals) -> {
 			// S1_1
 			if (dataLiterals.contains("ConnectionIntercepted")) {
