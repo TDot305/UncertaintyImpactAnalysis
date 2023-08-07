@@ -128,7 +128,7 @@ public class AbunaiAdapter {
 		var uncertaintySources = this.analysis.getUncertaintySources();
 		
 		for(var assumption : this.assumptions){
-			for(var affectedEntityID : assumption.getAffectedEntities().stream().map(modelEntity -> modelEntity.id()).toList()){
+			for(var affectedEntityID : assumption.getAffectedEntities().stream().map(modelEntity -> modelEntity.getId()).toList()){
 				if(propagationHelper.findAssemblyContext(affectedEntityID).isPresent()) {
 					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
 				} else if(propagationHelper.findResourceContainer(affectedEntityID).isPresent()) {
