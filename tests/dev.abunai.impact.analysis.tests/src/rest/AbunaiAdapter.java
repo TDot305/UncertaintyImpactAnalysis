@@ -8,9 +8,22 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.BiPredicate;
 
+import org.eclipse.emf.ecore.EObject;
 import org.palladiosimulator.dataflow.confidentiality.analysis.builder.DataFlowAnalysisBuilder;
 import org.palladiosimulator.dataflow.confidentiality.analysis.builder.pcm.PCMDataFlowConfidentialityAnalysisBuilder;
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.pcm.PCMActionSequence;
+import org.palladiosimulator.pcm.core.composition.AssemblyContext;
+import org.palladiosimulator.pcm.core.composition.Connector;
+import org.palladiosimulator.pcm.repository.Interface;
+import org.palladiosimulator.pcm.repository.Signature;
+import org.palladiosimulator.pcm.resourceenvironment.ResourceContainer;
+import org.palladiosimulator.pcm.seff.ExternalCallAction;
+import org.palladiosimulator.pcm.seff.SetVariableAction;
+import org.palladiosimulator.pcm.usagemodel.Branch;
+import org.palladiosimulator.pcm.usagemodel.EntryLevelSystemCall;
+import org.palladiosimulator.pcm.usagemodel.UsageScenario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import dev.abunai.impact.analysis.PCMUncertaintyImpactAnalysisBuilder;
 import dev.abunai.impact.analysis.StandalonePCMUncertaintyImpactAnalysis;
@@ -18,6 +31,7 @@ import dev.abunai.impact.analysis.model.UncertaintyImpactCollection;
 import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
 
 public class AbunaiAdapter {
+	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
 	public static final String TEST_MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
 	private StandalonePCMUncertaintyImpactAnalysis analysis = null;
 	
@@ -28,6 +42,7 @@ public class AbunaiAdapter {
 	private String scenarioName;
 
 	public String executeAnalysis() {
+		LOGGER.info("Initiating execution of analysis.");
 		String output = "#################### Analysis Output ####################\n";
 		
 		try (var outputStream = new ByteArrayOutputStream(); var printStream = new PrintStream(outputStream)){
@@ -41,7 +56,9 @@ public class AbunaiAdapter {
 			System.setOut(oldPrintStream);
 			
 			output += outputStream.toString();
+			LOGGER.info("Execution of analysis successfully completed.");
 		} catch (IOException e) {
+			LOGGER.error("Error occured during analysis execution.", e);
 			output += e.toString();
 		} 
 		
@@ -71,7 +88,7 @@ public class AbunaiAdapter {
 	}
 	
 	private void setup() {
-		System.out.println("Executing Set-Up...");
+		LOGGER.info("Performing set-up for the analysis.");
 		
 		final var usageModelPath = Paths.get(this.baseFolderName, this.folderName, this.filesName + ".usagemodel")
 				.toString();
@@ -90,10 +107,11 @@ public class AbunaiAdapter {
 
 		analysis.initializeAnalysis();
 		this.analysis = analysis;
-		System.out.println("Set-Up complete.");
+		LOGGER.info("Set-Up complete.");
 	}
 	
 	private void evaluateScenario() {
+		LOGGER.info("Evaluate given scenario.");
 		this.addUncertaintySources();
 
 		// Do uncertainty impact analysis
@@ -121,41 +139,47 @@ public class AbunaiAdapter {
 						UncertaintyImpactCollection.formatDataFlow(i, new PCMActionSequence(violations), true));
 			}
 		}
+		LOGGER.info("Finished evaluating the scenario.");
 	}
 	
 	private void addUncertaintySources() {
-		var propagationHelper = this.analysis.getPropagationHelper();
+		LOGGER.info("Add uncertainty sources for the specified entity-ids.");
 		var uncertaintySources = this.analysis.getUncertaintySources();
+		var resourceProvider = this.analysis.getResourceProvider();
 		
 		for(var assumption : this.assumptions){
 			for(var affectedEntityID : assumption.getAffectedEntities().stream().map(modelEntity -> modelEntity.getId()).toList()){
-				if(propagationHelper.findAssemblyContext(affectedEntityID).isPresent()) {
-					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
-				} else if(propagationHelper.findResourceContainer(affectedEntityID).isPresent()) {
-					uncertaintySources.addActorUncertaintyInResourceContainer(affectedEntityID);
-				} else if(propagationHelper.findUsageScenario(affectedEntityID).isPresent()) {
-					uncertaintySources.addActorUncertaintyInUsageScenario(affectedEntityID);
-				} else if(propagationHelper.findSignature(affectedEntityID).isPresent()) {
-					uncertaintySources.addInterfaceUncertaintyInSignature(affectedEntityID);
-				} else if(propagationHelper.findInterface(affectedEntityID).isPresent()) {
-					uncertaintySources.addInterfaceUncertaintyInInterface(affectedEntityID);
-				} else if(propagationHelper.findConnector(affectedEntityID).isPresent()) {
-					uncertaintySources.addConnectorUncertaintyInConnector(affectedEntityID);
-				} else {
-					/* TODO: Remaining cases that still need handling but have no support regarding the PropagationHelper:
-						[] addBehaviorUncertaintyInEntryLevelSystemCall
-						[] addBehaviorUncertaintyInExternalCallAction
-						[] addBehaviorUncertaintyInSetVariableAction
-						[] addBehaviorUncertainty
-					 */
-					
-					if(!propagationHelper.findStartActionsOfBranchAction(affectedEntityID).isEmpty()) {
-						uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntityID);
-					}
-					
+				EObject lookedUpElement = resourceProvider.lookupElementWithId(affectedEntityID);
+				
+				if(lookedUpElement == null) {
+					continue;
 				}
+				
+				if(lookedUpElement instanceof AssemblyContext) {
+					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
+				} else if(lookedUpElement instanceof ResourceContainer) {
+					uncertaintySources.addActorUncertaintyInResourceContainer(affectedEntityID);
+				} else if(lookedUpElement instanceof UsageScenario) {
+					uncertaintySources.addActorUncertaintyInUsageScenario(affectedEntityID);
+				} else if(lookedUpElement instanceof Signature) {
+					uncertaintySources.addInterfaceUncertaintyInSignature(affectedEntityID);
+				} else if(lookedUpElement instanceof Interface) {
+					uncertaintySources.addInterfaceUncertaintyInInterface(affectedEntityID);
+				} else if(lookedUpElement instanceof Connector) {
+					uncertaintySources.addConnectorUncertaintyInConnector(affectedEntityID);
+				} else if(lookedUpElement instanceof EntryLevelSystemCall){
+					uncertaintySources.addBehaviorUncertaintyInEntryLevelSystemCall(affectedEntityID);
+				} else if(lookedUpElement instanceof ExternalCallAction){
+					uncertaintySources.addBehaviorUncertaintyInExternalCallAction(affectedEntityID);
+				} else if(lookedUpElement instanceof SetVariableAction){
+					uncertaintySources.addBehaviorUncertaintyInSetVariableAction(affectedEntityID);
+				} else if(lookedUpElement instanceof Branch){
+					uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntityID);
+				} 
+					
 			}
 		}
+		LOGGER.info("Completed adding uncertainty sources");
 	}
 	
 	private BiPredicate<List<String>, List<String>> getConstraint(){
