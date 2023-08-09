@@ -6,6 +6,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Set;
 
 import javax.servlet.MultipartConfigElement;
@@ -18,76 +20,127 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class RestConnector {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RestConnector.class);
 	private static final String SERVICE_PATH = "/abunai";
-	
-	public static record AnalysisParameter(String modelPath, Set<Assumption> assumptions) {}
+
+	public static record AnalysisParameter(String modelPath, Set<Assumption> assumptions) {
+	}
+
+	private final File casestudiesDirectory;
+	private final ObjectMapper objectMapper;
+	private final AbunaiAdapter abunaiAdapter;
 
 	public static void main(String[] args) {
-		var objectMapper = new ObjectMapper();
-		var abunaiAdapter = new AbunaiAdapter();
-		
+		var restConnector = new RestConnector();
+		restConnector.initEndpoints();
+	}
+
+	public RestConnector() {
+		this.objectMapper = new ObjectMapper();
+		this.abunaiAdapter = new AbunaiAdapter();
+
 		// Determine casestudies folder.
-		File casestudiesDirectory = null;
+		File potentialCaseStudiesDirectory = null;
 		var userDirFile = new File(System.getProperty("user.dir"));
-		var potentialTestModelsDirFile = userDirFile.getParentFile().listFiles((File dir, String name) -> name.equals("dev.abunai.impact.analysis.testmodels"));
-		
-		if(potentialTestModelsDirFile != null && potentialTestModelsDirFile.length > 0) {
-			var potentialCasestudiesDirFile = potentialTestModelsDirFile[0].listFiles((File dir, String name) -> name.equals("casestudies"));
-			
-			if(potentialCasestudiesDirFile != null && potentialCasestudiesDirFile.length == 1) {
-				casestudiesDirectory = potentialCasestudiesDirFile[0];
+		var potentialTestModelsDirFile = userDirFile.getParentFile()
+				.listFiles((File dir, String name) -> name.equals("dev.abunai.impact.analysis.testmodels"));
+
+		if (potentialTestModelsDirFile != null && potentialTestModelsDirFile.length > 0) {
+			var potentialCasestudiesDirFile = potentialTestModelsDirFile[0]
+					.listFiles((File dir, String name) -> name.equals("casestudies"));
+
+			if (potentialCasestudiesDirFile != null && potentialCasestudiesDirFile.length == 1) {
+				potentialCaseStudiesDirectory = potentialCasestudiesDirFile[0];
 			}
 		}
-		
-		
+
+		this.casestudiesDirectory = (potentialCaseStudiesDirectory != null && potentialCaseStudiesDirectory.exists())
+				? potentialCaseStudiesDirectory
+				: null;
+	}
+
+	public void initEndpoints() {
 		// Set port of the microservice.
 		port(2406);
-		
-		
+
+		// Connection test endpoint.
 		get(SERVICE_PATH + "/test", (req, res) -> {
 			LOGGER.info("Recived connection test from '" + req.host() + "'.");
-			
+
 			res.status(200);
 			res.type("text/plain");
-			
+
 			return "Connection test from inside Abunai successful!";
 		});
 
+		// Analysis execution endpoint.
 		post(SERVICE_PATH + "/run", (req, res) -> {
 			LOGGER.info("Recived analysis execution command from '" + req.host() + "'.");
-		
-			abunaiAdapter.setAssumptions(objectMapper.readValue(req.body(), AnalysisParameter.class).assumptions());
-			abunaiAdapter.setBaseFolderName("casestudies/CaseStudy-CoronaWarnApp");
-			abunaiAdapter.setFilesName("default");
-			abunaiAdapter.setFolderName("CoronaWarnApp");
-			abunaiAdapter.setScenarioName("Scenario 1");
+
+			AnalysisParameter parameter = this.objectMapper.readValue(req.body(), AnalysisParameter.class);
+
+			// Extract model name.
+			int lastSeparatorIndex = parameter.modelPath.lastIndexOf(File.separator);
+			if (lastSeparatorIndex == -1) {
+				res.status(400);
+				res.body("Could not determine model name from the specified model path.");
+			}
+			String modelName = parameter.modelPath.substring(lastSeparatorIndex + 1);
+
+			// Configure AbunaiAdapter.
+			this.abunaiAdapter.setAssumptions(parameter.assumptions());
+			this.abunaiAdapter.setBaseFolderName("casestudies/CaseStudy-" + modelName);
+			this.abunaiAdapter.setFilesName("default");
+			this.abunaiAdapter.setFolderName(modelName);
+			this.abunaiAdapter.setScenarioName("Analysis of model '" + modelName + "' on "
+					+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date()));
 			res.status(200);
-			
-			String anaylsisOutput = abunaiAdapter.executeAnalysis();
+
+			String anaylsisOutput = this.abunaiAdapter.executeAnalysis();
 			LOGGER.info("Analysis was successfully perfomed.");
-			
+
 			return anaylsisOutput;
 		});
-		
-		post(SERVICE_PATH + "/set/model", (req, res) -> {
+
+		// Model transfer endpoint.
+		post(SERVICE_PATH + "/set/model/:modelName", (req, res) -> {
 			LOGGER.info("Recived model for analysis from '" + req.host() + "'.");
 
+			if (this.casestudiesDirectory == null || !this.casestudiesDirectory.exists()) {
+				res.status(500);
+				res.body("Analysis cannot locate 'casestudies' directory.");
+			}
+
 			if (req.raw().getAttribute("org.eclipse.jetty.multipartConfig") == null) {
-				 MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
-				 req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
+				MultipartConfigElement multipartConfigElement = new MultipartConfigElement(
+						System.getProperty("java.io.tmpdir"));
+				req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
 			}
-			
+
+			String modelName = req.params(":modelName");
+			if (modelName == null || modelName.isEmpty()) {
+				res.status(400);
+				res.body("No model name provided.");
+			}
+
+			// Create new Base Folder.
+			File modelFolder = new File(
+					this.casestudiesDirectory.getAbsolutePath() + File.separator + "CaseStudy-" + modelName);
+			if (!modelFolder.exists()) {
+				modelFolder.mkdir();
+			}
+
+			// Copy model files.
 			var parts = req.raw().getParts();
-			
-			for(var part : parts) {
-				var name = part.getName();
-				var path = Paths.get("/home/tbaechle/Desktop/TestTargetFolder/" + name); // TODO Integrate casestudiesDirectory and add error checks.
-				Files.copy(part.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING); 
+			for (var part : parts) {
+				var fileName = part.getName();
+				var targetFilePath = Paths
+						.get(modelFolder.getAbsolutePath() + File.separator + modelName + File.separator + fileName);
+
+				Files.copy(part.getInputStream(), targetFilePath, StandardCopyOption.REPLACE_EXISTING);
 			}
-			
+
 			res.status(200);
-			
+
 			return "Sucess!";
 		});
 	}
-
 }
