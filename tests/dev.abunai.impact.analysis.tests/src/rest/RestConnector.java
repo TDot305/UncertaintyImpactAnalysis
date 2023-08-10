@@ -97,6 +97,8 @@ public class RestConnector {
 			String anaylsisOutput = this.abunaiAdapter.executeAnalysis();
 			LOGGER.info("Analysis was successfully perfomed.");
 
+			// TODO Allow analysis to make changes to the assumptions and to retransmit them back to the FE.
+			
 			return anaylsisOutput;
 		});
 
@@ -122,18 +124,17 @@ public class RestConnector {
 			}
 
 			// Create new Base Folder.
-			File modelFolder = new File(
-					this.casestudiesDirectory.getAbsolutePath() + File.separator + "CaseStudy-" + modelName);
+			File modelFolder = new File(this.casestudiesDirectory.getAbsolutePath() + File.separator + "CaseStudy-"
+					+ modelName + File.separator + modelName);
 			if (!modelFolder.exists()) {
-				modelFolder.mkdir();
+				modelFolder.mkdirs();
 			}
 
 			// Copy model files.
 			var parts = req.raw().getParts();
 			for (var part : parts) {
 				var fileName = part.getName();
-				var targetFilePath = Paths
-						.get(modelFolder.getAbsolutePath() + File.separator + modelName + File.separator + fileName);
+				var targetFilePath = Paths.get(modelFolder.getAbsolutePath() + File.separator + fileName);
 
 				Files.copy(part.getInputStream(), targetFilePath, StandardCopyOption.REPLACE_EXISTING);
 			}

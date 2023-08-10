@@ -1,7 +1,6 @@
 package rest;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Paths;
 import java.util.List;
@@ -32,7 +31,8 @@ import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
 
 public class AbunaiAdapter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
-	public static final String TEST_MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
+	public static final String MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
+	
 	private StandalonePCMUncertaintyImpactAnalysis analysis = null;
 	
 	private Set<Assumption> assumptions;
@@ -57,7 +57,7 @@ public class AbunaiAdapter {
 			
 			output += outputStream.toString();
 			LOGGER.info("Execution of analysis successfully completed.");
-		} catch (IOException e) {
+		} catch (Exception e) {
 			LOGGER.error("Error occured during analysis execution.", e);
 			output += e.toString();
 		} 
@@ -97,7 +97,7 @@ public class AbunaiAdapter {
 		final var nodeCharacteristicsPath = Paths
 				.get(this.baseFolderName, this.folderName, this.filesName + ".nodecharacteristics").toString();
 		
-		var analysis = new DataFlowAnalysisBuilder().standalone().modelProjectName(TEST_MODEL_PROJECT_NAME)
+		var analysis = new DataFlowAnalysisBuilder().standalone().modelProjectName(MODEL_PROJECT_NAME)
 				.useBuilder(new PCMDataFlowConfidentialityAnalysisBuilder())
 				.usePluginActivator(Activator.class)
 				.useUsageModel(usageModelPath)
