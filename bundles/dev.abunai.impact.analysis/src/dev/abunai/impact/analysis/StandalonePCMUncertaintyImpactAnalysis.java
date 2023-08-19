@@ -7,7 +7,6 @@ import org.eclipse.core.runtime.Plugin;
 import org.palladiosimulator.dataflow.confidentiality.analysis.builder.AnalysisData;
 import org.palladiosimulator.dataflow.confidentiality.analysis.core.AbstractStandalonePCMDataFlowConfidentialityAnalysis;
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.sequence.ActionSequence;
-import org.palladiosimulator.dataflow.confidentiality.analysis.resource.ResourceLoader;
 
 import dev.abunai.impact.analysis.model.UncertaintyImpactCollection;
 import dev.abunai.impact.analysis.model.UncertaintySourceCollection;
@@ -38,7 +37,7 @@ public class StandalonePCMUncertaintyImpactAnalysis extends AbstractStandalonePC
 	public boolean initializeAnalysis() {
 		if (super.initializeAnalysis()) {
 			this.actionSequences = super.findAllSequences();
-			this.propagationHelper = new PropagationHelper(this.actionSequences, analysisData.getResourceLoader());
+			this.propagationHelper = new PropagationHelper(this.actionSequences, analysisData.getResourceProvider());
 			this.uncertaintySourceCollection = new UncertaintySourceCollection(this.actionSequences, propagationHelper);
 			return true;
 		} else {
@@ -46,9 +45,6 @@ public class StandalonePCMUncertaintyImpactAnalysis extends AbstractStandalonePC
 		}
 	}
 
-	public PropagationHelper getPropagationHelper() {
-		return this.propagationHelper;
-	}
 	
 	public UncertaintySourceCollection getUncertaintySources() {
 		return this.uncertaintySourceCollection;

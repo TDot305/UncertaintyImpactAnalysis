@@ -3,8 +3,10 @@ package rest;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiPredicate;
 
 import org.eclipse.emf.ecore.EObject;
@@ -32,76 +34,63 @@ import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
 public class AbunaiAdapter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
 	public static final String MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
-	
+
 	private StandalonePCMUncertaintyImpactAnalysis analysis = null;
-	
-	private Set<Assumption> assumptions;
+
+	private Collection<Assumption> assumptions;
 	private String baseFolderName;
 	private String folderName;
 	private String filesName;
 	private String scenarioName;
 
+	public void initializeNewState(Collection<Assumption> assumptions, String baseFolderName, String folderName,
+			String filesName, String scenarioName) {
+		this.assumptions = assumptions;
+		this.baseFolderName = baseFolderName;
+		this.folderName = folderName;
+		this.filesName = filesName;
+		this.scenarioName = scenarioName;
+	}
+
 	public String executeAnalysis() {
 		LOGGER.info("Initiating execution of analysis.");
 		String output = "#################### Analysis Output ####################\n";
-		
-		try (var outputStream = new ByteArrayOutputStream(); var printStream = new PrintStream(outputStream)){
+
+		try (var outputStream = new ByteArrayOutputStream(); var printStream = new PrintStream(outputStream)) {
 			var oldPrintStream = System.out;
 			System.setOut(printStream);
-			
+
 			this.setup();
 			this.evaluateScenario();
-			
+
 			System.out.flush();
 			System.setOut(oldPrintStream);
-			
+
 			output += outputStream.toString();
 			LOGGER.info("Execution of analysis successfully completed.");
 		} catch (Exception e) {
 			LOGGER.error("Error occured during analysis execution.", e);
 			output += e.toString();
-		} 
-		
+		}
+
 		output += "\n#########################################################";
-		
+
 		return output;
 	}
-	
-	public void setAssumptions(Set<Assumption> assumptions) {
-		this.assumptions = assumptions;
-	}
-	
-	public void setBaseFolderName(String baseFolderName) {
-		this.baseFolderName = baseFolderName;
-	}
 
-	public void setFolderName(String folderName) {
-		this.folderName = folderName;
-	}
-
-	public void setFilesName(String filesName) {
-		this.filesName = filesName;
-	}
-
-	public void setScenarioName(String scenarioName) {
-		this.scenarioName = scenarioName;
-	}
-	
 	private void setup() {
 		LOGGER.info("Performing set-up for the analysis.");
-		
+
 		final var usageModelPath = Paths.get(this.baseFolderName, this.folderName, this.filesName + ".usagemodel")
 				.toString();
 		final var allocationPath = Paths.get(this.baseFolderName, this.folderName, this.filesName + ".allocation")
 				.toString();
 		final var nodeCharacteristicsPath = Paths
 				.get(this.baseFolderName, this.folderName, this.filesName + ".nodecharacteristics").toString();
-		
+
 		var analysis = new DataFlowAnalysisBuilder().standalone().modelProjectName(MODEL_PROJECT_NAME)
-				.useBuilder(new PCMDataFlowConfidentialityAnalysisBuilder())
-				.usePluginActivator(Activator.class)
-				.useUsageModel(usageModelPath)
-				.useAllocationModel(allocationPath)
+				.useBuilder(new PCMDataFlowConfidentialityAnalysisBuilder()).usePluginActivator(Activator.class)
+				.useUsageModel(usageModelPath).useAllocationModel(allocationPath)
 				.useNodeCharacteristicsModel(nodeCharacteristicsPath)
 				.useBuilder(new PCMUncertaintyImpactAnalysisBuilder()).build();
 
@@ -109,7 +98,7 @@ public class AbunaiAdapter {
 		this.analysis = analysis;
 		LOGGER.info("Set-Up complete.");
 	}
-	
+
 	private void evaluateScenario() {
 		LOGGER.info("Evaluate given scenario.");
 		this.addUncertaintySources();
@@ -141,60 +130,78 @@ public class AbunaiAdapter {
 		}
 		LOGGER.info("Finished evaluating the scenario.");
 	}
-	
+
 	private void addUncertaintySources() {
 		LOGGER.info("Add uncertainty sources for the specified entity-ids.");
 		var uncertaintySources = this.analysis.getUncertaintySources();
 		var resourceProvider = this.analysis.getResourceProvider();
-		
-		for(var assumption : this.assumptions){
-			for(var affectedEntityID : assumption.getAffectedEntities().stream().map(modelEntity -> modelEntity.getId()).toList()){
+
+		for (var assumption : this.assumptions) {
+			for (var affectedEntityID : assumption.getAffectedEntities().stream()
+					.map(modelEntity -> modelEntity.getId()).toList()) {
 				EObject lookedUpElement = resourceProvider.lookupElementWithId(affectedEntityID);
-				
-				if(lookedUpElement == null) {
+
+				if (lookedUpElement == null) {
 					continue;
 				}
-				
-				if(lookedUpElement instanceof AssemblyContext) {
+
+				if (lookedUpElement instanceof AssemblyContext) {
 					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
-				} else if(lookedUpElement instanceof ResourceContainer) {
+				} else if (lookedUpElement instanceof ResourceContainer) {
 					uncertaintySources.addActorUncertaintyInResourceContainer(affectedEntityID);
-				} else if(lookedUpElement instanceof UsageScenario) {
+				} else if (lookedUpElement instanceof UsageScenario) {
 					uncertaintySources.addActorUncertaintyInUsageScenario(affectedEntityID);
-				} else if(lookedUpElement instanceof Signature) {
+				} else if (lookedUpElement instanceof Signature) {
 					uncertaintySources.addInterfaceUncertaintyInSignature(affectedEntityID);
-				} else if(lookedUpElement instanceof Interface) {
+				} else if (lookedUpElement instanceof Interface) {
 					uncertaintySources.addInterfaceUncertaintyInInterface(affectedEntityID);
-				} else if(lookedUpElement instanceof Connector) {
+				} else if (lookedUpElement instanceof Connector) {
 					uncertaintySources.addConnectorUncertaintyInConnector(affectedEntityID);
-				} else if(lookedUpElement instanceof EntryLevelSystemCall){
+				} else if (lookedUpElement instanceof EntryLevelSystemCall) {
 					uncertaintySources.addBehaviorUncertaintyInEntryLevelSystemCall(affectedEntityID);
-				} else if(lookedUpElement instanceof ExternalCallAction){
+				} else if (lookedUpElement instanceof ExternalCallAction) {
 					uncertaintySources.addBehaviorUncertaintyInExternalCallAction(affectedEntityID);
-				} else if(lookedUpElement instanceof SetVariableAction){
+				} else if (lookedUpElement instanceof SetVariableAction) {
 					uncertaintySources.addBehaviorUncertaintyInSetVariableAction(affectedEntityID);
-				} else if(lookedUpElement instanceof Branch){
+				} else if (lookedUpElement instanceof Branch) {
 					uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntityID);
-				} 
-					
+				}
 			}
 		}
 		LOGGER.info("Completed adding uncertainty sources");
 	}
+
+	private BiPredicate<List<String>, List<String>> getConstraint() {
+		var dataConstraints = new HashSet<String>();
+		var nodeConstraints = new HashSet<String>();
+		
+		// Extract constraints from the individual assumption descriptions.
+		this.assumptions.forEach(assumption -> {
+			String assumptionDescription = assumption.getDescription();
+			String[] descriptionLines = assumptionDescription.split(System.lineSeparator());
+			
+			for(String descriptionLine : descriptionLines) {
+				String lineWithoutWhitespace = descriptionLine.replaceAll("\\s", "");
+				String[] lineComponents = lineWithoutWhitespace.split(":");
+				
+				if(lineComponents.length == 2) {
+					if(lineComponents[0].toLowerCase().equals("dataconstraints") || lineComponents[0].toLowerCase().equals("nodeconstraints")) {
+						HashSet<String> target = lineComponents[0].toLowerCase().equals("dataconstraints") ? dataConstraints : nodeConstraints;
+						
+						for(String constraint : lineComponents[1].split(",")) {
+							target.add(constraint);
+						}
+					}
+				}
+			}
+		});
 	
-	private BiPredicate<List<String>, List<String>> getConstraint(){
-		/*
-		 * TODO: Evaluate how to generalize implementation (if necessary).
-		 * Current implementation is just copied from EvaluationScenario1.java for testing purposes. 
-		 * */
 		return (List<String> dataLiterals, List<String> nodeLiterals) -> {
-			// S1_1
-			if (dataLiterals.contains("ConnectionIntercepted")) {
+			if (!Collections.disjoint(dataLiterals, dataConstraints)) {
 				return true;
 			}
 
-			// S1_2
-			if (nodeLiterals.contains("IllegalDeploymentLocation")) {
+			if (!Collections.disjoint(nodeLiterals, nodeConstraints)) {
 				return true;
 			}
 

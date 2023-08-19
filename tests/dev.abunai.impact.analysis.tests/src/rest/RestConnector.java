@@ -86,19 +86,18 @@ public class RestConnector {
 			String modelName = parameter.modelPath.substring(lastSeparatorIndex + 1);
 
 			// Configure AbunaiAdapter.
-			this.abunaiAdapter.setAssumptions(parameter.assumptions());
-			this.abunaiAdapter.setBaseFolderName("casestudies/CaseStudy-" + modelName);
-			this.abunaiAdapter.setFilesName("default");
-			this.abunaiAdapter.setFolderName(modelName);
-			this.abunaiAdapter.setScenarioName("Analysis of model '" + modelName + "' on "
-					+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date()));
+			this.abunaiAdapter.initializeNewState(parameter.assumptions(), "casestudies/CaseStudy-" + modelName,
+					modelName, "default", "Analysis of model '" + modelName + "' on "
+							+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date()));
+
 			res.status(200);
 
 			String anaylsisOutput = this.abunaiAdapter.executeAnalysis();
 			LOGGER.info("Analysis was successfully perfomed.");
 
-			// TODO Allow analysis to make changes to the assumptions and to retransmit them back to the FE.
-			
+			// TODO Allow analysis to make changes to the assumptions and to retransmit them
+			// back to the FE.
+
 			return anaylsisOutput;
 		});
 

@@ -16,7 +16,7 @@ import org.palladiosimulator.dataflow.confidentiality.analysis.entity.pcm.seff.S
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.pcm.user.CallingUserActionSequenceElement;
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.sequence.AbstractActionSequenceElement;
 import org.palladiosimulator.dataflow.confidentiality.analysis.entity.sequence.ActionSequence;
-import org.palladiosimulator.dataflow.confidentiality.analysis.resource.ResourceLoader;
+import org.palladiosimulator.dataflow.confidentiality.analysis.resource.ResourceProvider;
 import org.palladiosimulator.dataflow.confidentiality.analysis.utils.pcm.PCMQueryUtils;
 import org.palladiosimulator.pcm.allocation.Allocation;
 import org.palladiosimulator.pcm.core.composition.AssemblyContext;
@@ -41,9 +41,9 @@ import org.palladiosimulator.pcm.usagemodel.UsageScenario;
 public class PropagationHelper {
 
 	private List<ActionSequence> actionSequences;
-	private final ResourceLoader resourceLoader;
+	private final ResourceProvider resourceLoader;
 
-	public PropagationHelper(List<ActionSequence> actionSequences, ResourceLoader resourceLoader) {
+	public PropagationHelper(List<ActionSequence> actionSequences, ResourceProvider resourceLoader) {
 		this.actionSequences = actionSequences;
 		this.resourceLoader = resourceLoader;
 	}
