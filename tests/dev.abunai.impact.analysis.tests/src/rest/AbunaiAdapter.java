@@ -30,6 +30,7 @@ import dev.abunai.impact.analysis.PCMUncertaintyImpactAnalysisBuilder;
 import dev.abunai.impact.analysis.StandalonePCMUncertaintyImpactAnalysis;
 import dev.abunai.impact.analysis.model.UncertaintyImpactCollection;
 import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
+import rest.RestConnector.AnalysisOutput;
 
 public class AbunaiAdapter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
@@ -52,7 +53,7 @@ public class AbunaiAdapter {
 		this.scenarioName = scenarioName;
 	}
 
-	public String executeAnalysis() {
+	public AnalysisOutput executeAnalysis() {
 		LOGGER.info("Initiating execution of analysis.");
 		String output = "#################### Analysis Output ####################\n";
 
@@ -75,7 +76,8 @@ public class AbunaiAdapter {
 
 		output += "\n#########################################################";
 
-		return output;
+		// Abunai is an analysis that doses not alter the assumption set.
+		return new AnalysisOutput(output, null); 
 	}
 
 	private void setup() {
@@ -112,6 +114,7 @@ public class AbunaiAdapter {
 		var evaluatedSequences = analysis.evaluateDataFlows(actionSequences);
 
 		System.out.println("Confidentiality Violations: ");
+		var constraint = this.getConstraint();
 		for (int i = 0; i < evaluatedSequences.size(); i++) {
 			var violations = analysis.queryDataFlow(evaluatedSequences.get(i), it -> {
 
@@ -120,7 +123,7 @@ public class AbunaiAdapter {
 				List<String> nodeLiterals = it.getAllNodeCharacteristics().stream()
 						.map(e -> e.characteristicLiteral().getName()).toList();
 
-				return this.getConstraint().test(dataLiterals, nodeLiterals);
+				return constraint.test(dataLiterals, nodeLiterals);
 			});
 
 			if (!violations.isEmpty()) {
@@ -168,40 +171,44 @@ public class AbunaiAdapter {
 				}
 			}
 		}
+		
 		LOGGER.info("Completed adding uncertainty sources");
 	}
 
 	private BiPredicate<List<String>, List<String>> getConstraint() {
 		var dataConstraints = new HashSet<String>();
 		var nodeConstraints = new HashSet<String>();
-		
+
 		// Extract constraints from the individual assumption descriptions.
 		this.assumptions.forEach(assumption -> {
 			String assumptionDescription = assumption.getDescription();
 			String[] descriptionLines = assumptionDescription.split(System.lineSeparator());
-			
-			for(String descriptionLine : descriptionLines) {
+
+			for (String descriptionLine : descriptionLines) {
 				String lineWithoutWhitespace = descriptionLine.replaceAll("\\s", "");
 				String[] lineComponents = lineWithoutWhitespace.split(":");
-				
-				if(lineComponents.length == 2) {
-					if(lineComponents[0].toLowerCase().equals("dataconstraints") || lineComponents[0].toLowerCase().equals("nodeconstraints")) {
-						HashSet<String> target = lineComponents[0].toLowerCase().equals("dataconstraints") ? dataConstraints : nodeConstraints;
-						
-						for(String constraint : lineComponents[1].split(",")) {
+
+				if (lineComponents.length == 2) {
+					if (lineComponents[0].toLowerCase().equals("dataconstraints")
+							|| lineComponents[0].toLowerCase().equals("nodeconstraints")) {
+						HashSet<String> target = lineComponents[0].toLowerCase().equals("dataconstraints")
+								? dataConstraints
+								: nodeConstraints;
+
+						for (String constraint : lineComponents[1].split(",")) {
 							target.add(constraint);
 						}
 					}
 				}
 			}
 		});
-	
+
 		return (List<String> dataLiterals, List<String> nodeLiterals) -> {
-			if (!Collections.disjoint(dataLiterals, dataConstraints)) {
+			if (!dataConstraints.isEmpty() && !Collections.disjoint(dataLiterals, dataConstraints)) {
 				return true;
 			}
 
-			if (!Collections.disjoint(nodeLiterals, nodeConstraints)) {
+			if (!nodeConstraints.isEmpty() && !Collections.disjoint(nodeLiterals, nodeConstraints)) {
 				return true;
 			}
 

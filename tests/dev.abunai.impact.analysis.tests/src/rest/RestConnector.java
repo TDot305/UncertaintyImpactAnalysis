@@ -7,9 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.Collection;
 import java.util.Date;
-import java.util.Set;
-
 import javax.servlet.MultipartConfigElement;
 
 import org.slf4j.Logger;
@@ -21,7 +20,10 @@ public class RestConnector {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RestConnector.class);
 	private static final String SERVICE_PATH = "/abunai";
 
-	public static record AnalysisParameter(String modelPath, Set<Assumption> assumptions) {
+	public static record AnalysisParameter(String modelPath, Collection<Assumption> assumptions) {
+	}
+
+	public static record AnalysisOutput(String outputLog, Collection<Assumption> assumptions) {
 	}
 
 	private final File casestudiesDirectory;
@@ -90,15 +92,13 @@ public class RestConnector {
 					modelName, "default", "Analysis of model '" + modelName + "' on "
 							+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date()));
 
-			res.status(200);
 
-			String anaylsisOutput = this.abunaiAdapter.executeAnalysis();
+			AnalysisOutput anaylsisOutput = this.abunaiAdapter.executeAnalysis();
 			LOGGER.info("Analysis was successfully perfomed.");
-
-			// TODO Allow analysis to make changes to the assumptions and to retransmit them
-			// back to the FE.
-
-			return anaylsisOutput;
+			
+			res.status(200);
+			res.type("application/json");
+			return this.objectMapper.writeValueAsString(anaylsisOutput);
 		});
 
 		// Model transfer endpoint.
