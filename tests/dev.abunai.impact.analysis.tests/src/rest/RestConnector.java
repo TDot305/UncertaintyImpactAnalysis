@@ -16,14 +16,16 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import rest.entities.SecurityCheckAssumption;
+
 public class RestConnector {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RestConnector.class);
 	private static final String SERVICE_PATH = "/abunai";
 
-	public static record AnalysisParameter(String modelPath, Collection<Assumption> assumptions) {
+	public static record AnalysisParameter(String modelPath, Collection<SecurityCheckAssumption> assumptions) {
 	}
 
-	public static record AnalysisOutput(String outputLog, Collection<Assumption> assumptions) {
+	public static record AnalysisOutput(String outputLog, Collection<SecurityCheckAssumption> assumptions) {
 	}
 
 	private final File casestudiesDirectory;
@@ -76,7 +78,7 @@ public class RestConnector {
 		// Analysis execution endpoint.
 		post(SERVICE_PATH + "/run", (req, res) -> {
 			LOGGER.info("Recived analysis execution command from '" + req.host() + "'.");
-
+			
 			AnalysisParameter parameter = this.objectMapper.readValue(req.body(), AnalysisParameter.class);
 
 			// Extract model name.

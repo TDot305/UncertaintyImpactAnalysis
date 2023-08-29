@@ -2,6 +2,8 @@ package rest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,20 +33,22 @@ import dev.abunai.impact.analysis.StandalonePCMUncertaintyImpactAnalysis;
 import dev.abunai.impact.analysis.model.UncertaintyImpactCollection;
 import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
 import rest.RestConnector.AnalysisOutput;
+import rest.entities.SecurityCheckAssumption;
 
+// TODO Create fitting Interface fur future reuse.
 public class AbunaiAdapter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
 	public static final String MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
 
 	private StandalonePCMUncertaintyImpactAnalysis analysis = null;
 
-	private Collection<Assumption> assumptions;
+	private Collection<SecurityCheckAssumption> assumptions;
 	private String baseFolderName;
 	private String folderName;
 	private String filesName;
 	private String scenarioName;
 
-	public void initializeNewState(Collection<Assumption> assumptions, String baseFolderName, String folderName,
+	public void initializeNewState(Collection<SecurityCheckAssumption> assumptions, String baseFolderName, String folderName,
 			String filesName, String scenarioName) {
 		this.assumptions = assumptions;
 		this.baseFolderName = baseFolderName;
@@ -55,7 +59,7 @@ public class AbunaiAdapter {
 
 	public AnalysisOutput executeAnalysis() {
 		LOGGER.info("Initiating execution of analysis.");
-		String output = "#################### Analysis Output ####################\n";
+		StringBuilder outputStringBuilder = new StringBuilder("#################### Analysis Output ####################\n");
 
 		try (var outputStream = new ByteArrayOutputStream(); var printStream = new PrintStream(outputStream)) {
 			var oldPrintStream = System.out;
@@ -67,17 +71,21 @@ public class AbunaiAdapter {
 			System.out.flush();
 			System.setOut(oldPrintStream);
 
-			output += outputStream.toString();
+			outputStringBuilder.append(outputStream.toString());
 			LOGGER.info("Execution of analysis successfully completed.");
 		} catch (Exception e) {
 			LOGGER.error("Error occured during analysis execution.", e);
-			output += e.toString();
+			outputStringBuilder.append("Analysis execution encountered a fatal error. Details are shown below:\n");
+			
+			var stringWriter = new StringWriter();
+			e.printStackTrace(new PrintWriter(stringWriter)); 
+			
+			outputStringBuilder.append(stringWriter.toString());
 		}
 
-		output += "\n#########################################################";
+		outputStringBuilder.append("\n#########################################################");
 
-		// Abunai is an analysis that doses not alter the assumption set.
-		return new AnalysisOutput(output, null); 
+		return new AnalysisOutput(outputStringBuilder.toString(), this.assumptions); 
 	}
 
 	private void setup() {
@@ -170,6 +178,7 @@ public class AbunaiAdapter {
 					uncertaintySources.addBehaviorUncertaintyInBranch(affectedEntityID);
 				}
 			}
+			assumption.setAnalyzed(true);
 		}
 		
 		LOGGER.info("Completed adding uncertainty sources");

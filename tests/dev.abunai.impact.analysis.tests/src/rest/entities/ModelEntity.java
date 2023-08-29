@@ -1,4 +1,4 @@
-package rest;
+package rest.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
