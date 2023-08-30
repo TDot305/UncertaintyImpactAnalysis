@@ -44,7 +44,9 @@ public class RestConnector {
 		// Determine casestudies folder.
 		File potentialCaseStudiesDirectory = null;
 		var userDirFile = new File(System.getProperty("user.dir"));
-		var potentialTestModelsDirFile = userDirFile.getParentFile()
+		
+		var parentDirOfUserDir = userDirFile.getParent();
+		var potentialTestModelsDirFile = parentDirOfUserDir == null ? null : userDirFile.getParentFile()
 				.listFiles((File dir, String name) -> name.equals("dev.abunai.impact.analysis.testmodels"));
 
 		if (potentialTestModelsDirFile != null && potentialTestModelsDirFile.length > 0) {
@@ -109,7 +111,7 @@ public class RestConnector {
 
 			if (this.casestudiesDirectory == null || !this.casestudiesDirectory.exists()) {
 				res.status(500);
-				res.body("Analysis cannot locate 'casestudies' directory.");
+				return "Analysis cannot locate 'casestudies' directory.";
 			}
 
 			if (req.raw().getAttribute("org.eclipse.jetty.multipartConfig") == null) {
