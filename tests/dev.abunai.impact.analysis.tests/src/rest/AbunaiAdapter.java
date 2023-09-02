@@ -1,12 +1,15 @@
 package rest;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.BiPredicate;
@@ -32,11 +35,12 @@ import dev.abunai.impact.analysis.PCMUncertaintyImpactAnalysisBuilder;
 import dev.abunai.impact.analysis.StandalonePCMUncertaintyImpactAnalysis;
 import dev.abunai.impact.analysis.model.UncertaintyImpactCollection;
 import edu.kit.kastel.dsis.uncertainty.impactanalysis.testmodels.Activator;
-import rest.RestConnector.AnalysisOutput;
 import rest.entities.SecurityCheckAssumption;
+import rest.general.RestConnector.AnalysisOutput;
+import rest.general.RestConnector.AnalysisParameter;
+import rest.general.SecurityCheckAdapter;
 
-// TODO Create fitting Interface fur future reuse.
-public class AbunaiAdapter {
+public class AbunaiAdapter implements SecurityCheckAdapter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiAdapter.class);
 	public static final String MODEL_PROJECT_NAME = "dev.abunai.impact.analysis.testmodels";
 
@@ -48,18 +52,28 @@ public class AbunaiAdapter {
 	private String filesName;
 	private String scenarioName;
 
-	public void initializeNewState(Collection<SecurityCheckAssumption> assumptions, String baseFolderName, String folderName,
-			String filesName, String scenarioName) {
-		this.assumptions = assumptions;
-		this.baseFolderName = baseFolderName;
-		this.folderName = folderName;
-		this.filesName = filesName;
-		this.scenarioName = scenarioName;
+	@Override
+	public void initForAnalysis(AnalysisParameter parameter) throws IllegalArgumentException {
+		// Extract model name.
+		int lastSeparatorIndex = parameter.modelPath().lastIndexOf(File.separator);
+		if (lastSeparatorIndex == -1) {
+			throw new IllegalArgumentException("Could not determine model name from the specified model path.");
+		}
+		String modelName = parameter.modelPath().substring(lastSeparatorIndex + 1);
+
+		this.assumptions = parameter.assumptions();
+		this.baseFolderName = "casestudies/CaseStudy-" + modelName;
+		this.folderName = modelName;
+		this.filesName = "default";
+		this.scenarioName = "Analysis of model '" + modelName + "' on "
+				+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date());
 	}
 
+	@Override
 	public AnalysisOutput executeAnalysis() {
 		LOGGER.info("Initiating execution of analysis.");
-		StringBuilder outputStringBuilder = new StringBuilder("#################### Analysis Output ####################\n");
+		StringBuilder outputStringBuilder = new StringBuilder(
+				"#################### Analysis Output ####################\n");
 
 		try (var outputStream = new ByteArrayOutputStream(); var printStream = new PrintStream(outputStream)) {
 			var oldPrintStream = System.out;
@@ -76,16 +90,16 @@ public class AbunaiAdapter {
 		} catch (Exception e) {
 			LOGGER.error("Error occured during analysis execution.", e);
 			outputStringBuilder.append("Analysis execution encountered a fatal error. Details are shown below:\n");
-			
+
 			var stringWriter = new StringWriter();
-			e.printStackTrace(new PrintWriter(stringWriter)); 
-			
+			e.printStackTrace(new PrintWriter(stringWriter));
+
 			outputStringBuilder.append(stringWriter.toString());
 		}
 
 		outputStringBuilder.append("\n#########################################################");
 
-		return new AnalysisOutput(outputStringBuilder.toString(), this.assumptions); 
+		return new AnalysisOutput(outputStringBuilder.toString(), this.assumptions);
 	}
 
 	private void setup() {
@@ -180,7 +194,7 @@ public class AbunaiAdapter {
 			}
 			assumption.setAnalyzed(true);
 		}
-		
+
 		LOGGER.info("Completed adding uncertainty sources");
 	}
 

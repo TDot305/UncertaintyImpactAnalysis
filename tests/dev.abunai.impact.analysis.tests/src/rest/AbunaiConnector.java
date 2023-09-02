@@ -1,14 +1,10 @@
 package rest;
 
-import static spark.Spark.*;
-
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.text.SimpleDateFormat;
-import java.util.Collection;
-import java.util.Date;
+
 import javax.servlet.MultipartConfigElement;
 
 import org.slf4j.Logger;
@@ -16,38 +12,35 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import rest.entities.SecurityCheckAssumption;
+import rest.general.RestConnector;
+import rest.general.SecurityCheckAdapter;
+import spark.Spark;
 
-public class RestConnector {
-	private static final Logger LOGGER = LoggerFactory.getLogger(RestConnector.class);
+public class AbunaiConnector extends RestConnector {
+	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiConnector.class);
 	private static final String SERVICE_PATH = "/abunai";
-
-	public static record AnalysisParameter(String modelPath, Collection<SecurityCheckAssumption> assumptions) {
-	}
-
-	public static record AnalysisOutput(String outputLog, Collection<SecurityCheckAssumption> assumptions) {
-	}
 
 	private final File casestudiesDirectory;
 	private final ObjectMapper objectMapper;
-	private final AbunaiAdapter abunaiAdapter;
+	private final SecurityCheckAdapter abunaiAdapter;
 
 	public static void main(String[] args) {
-		var restConnector = new RestConnector();
-		restConnector.initEndpoints();
+		var restConnector = new AbunaiConnector();
+		restConnector.initEndpoints(2406);
 	}
 
-	public RestConnector() {
+	public AbunaiConnector() {
 		this.objectMapper = new ObjectMapper();
 		this.abunaiAdapter = new AbunaiAdapter();
 
 		// Determine casestudies folder.
 		File potentialCaseStudiesDirectory = null;
 		var userDirFile = new File(System.getProperty("user.dir"));
-		
+
 		var parentDirOfUserDir = userDirFile.getParent();
-		var potentialTestModelsDirFile = parentDirOfUserDir == null ? null : userDirFile.getParentFile()
-				.listFiles((File dir, String name) -> name.equals("dev.abunai.impact.analysis.testmodels"));
+		var potentialTestModelsDirFile = parentDirOfUserDir == null ? null
+				: userDirFile.getParentFile()
+						.listFiles((File dir, String name) -> name.equals("dev.abunai.impact.analysis.testmodels"));
 
 		if (potentialTestModelsDirFile != null && potentialTestModelsDirFile.length > 0) {
 			var potentialCasestudiesDirFile = potentialTestModelsDirFile[0]
@@ -63,12 +56,10 @@ public class RestConnector {
 				: null;
 	}
 
-	public void initEndpoints() {
-		// Set port of the microservice.
-		port(2406);
-
+	@Override
+	protected void initConnectionTestEndpoint() {
 		// Connection test endpoint.
-		get(SERVICE_PATH + "/test", (req, res) -> {
+		Spark.get(SERVICE_PATH + "/test", (req, res) -> {
 			LOGGER.info("Recived connection test from '" + req.host() + "'.");
 
 			res.status(200);
@@ -76,37 +67,11 @@ public class RestConnector {
 
 			return "Connection test from inside Abunai successful!";
 		});
+	}
 
-		// Analysis execution endpoint.
-		post(SERVICE_PATH + "/run", (req, res) -> {
-			LOGGER.info("Recived analysis execution command from '" + req.host() + "'.");
-			
-			AnalysisParameter parameter = this.objectMapper.readValue(req.body(), AnalysisParameter.class);
-
-			// Extract model name.
-			int lastSeparatorIndex = parameter.modelPath.lastIndexOf(File.separator);
-			if (lastSeparatorIndex == -1) {
-				res.status(400);
-				res.body("Could not determine model name from the specified model path.");
-			}
-			String modelName = parameter.modelPath.substring(lastSeparatorIndex + 1);
-
-			// Configure AbunaiAdapter.
-			this.abunaiAdapter.initializeNewState(parameter.assumptions(), "casestudies/CaseStudy-" + modelName,
-					modelName, "default", "Analysis of model '" + modelName + "' on "
-							+ new SimpleDateFormat("dd.MM.yyyy 'at' HH:mm:ss").format(new Date()));
-
-
-			AnalysisOutput anaylsisOutput = this.abunaiAdapter.executeAnalysis();
-			LOGGER.info("Analysis was successfully perfomed.");
-			
-			res.status(200);
-			res.type("application/json");
-			return this.objectMapper.writeValueAsString(anaylsisOutput);
-		});
-
+	protected void initModelTransferEndpoint() {
 		// Model transfer endpoint.
-		post(SERVICE_PATH + "/set/model/:modelName", (req, res) -> {
+		Spark.post(SERVICE_PATH + "/set/model/:modelName", (req, res) -> {
 			LOGGER.info("Recived model for analysis from '" + req.host() + "'.");
 
 			if (this.casestudiesDirectory == null || !this.casestudiesDirectory.exists()) {
@@ -145,6 +110,31 @@ public class RestConnector {
 			res.status(200);
 
 			return "Sucess!";
+		});
+	}
+
+	protected void initAnalysisExecutionEndpoint() {
+		// Analysis execution endpoint.
+		Spark.post(SERVICE_PATH + "/run", (req, res) -> {
+			LOGGER.info("Recived analysis execution command from '" + req.host() + "'.");
+
+			AnalysisParameter parameter = this.objectMapper.readValue(req.body(), AnalysisParameter.class);
+
+			// Configure AbunaiAdapter.
+			try {
+				this.abunaiAdapter.initForAnalysis(parameter);
+			} catch (IllegalArgumentException e) {
+				LOGGER.error(e.getMessage());
+				res.status(400);
+				return e.getMessage();
+			}
+
+			AnalysisOutput anaylsisOutput = this.abunaiAdapter.executeAnalysis();
+			LOGGER.info("Analysis was successfully perfomed.");
+
+			res.status(200);
+			res.type("application/json");
+			return this.objectMapper.writeValueAsString(anaylsisOutput);
 		});
 	}
 }
