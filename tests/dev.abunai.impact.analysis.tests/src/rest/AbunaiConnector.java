@@ -18,6 +18,9 @@ import spark.Spark;
 
 public class AbunaiConnector extends RestConnector {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbunaiConnector.class);
+	private static final String CASESTUDIES_DIR_CONTAINER = "AbunaiDependencies" + File.separator
+			+ "UncertaintyImpactAnalysis" + File.separator + "tests" + File.separator
+			+ "dev.abunai.impact.analysis.testmodels" + File.separator + "casestudies";
 	private static final String SERVICE_PATH = "/abunai";
 
 	private final File casestudiesDirectory;
@@ -53,14 +56,14 @@ public class AbunaiConnector extends RestConnector {
 
 		this.casestudiesDirectory = (potentialCaseStudiesDirectory != null && potentialCaseStudiesDirectory.exists())
 				? potentialCaseStudiesDirectory
-				: null;
+				: new File(AbunaiConnector.CASESTUDIES_DIR_CONTAINER);
 	}
 
 	@Override
 	protected void initConnectionTestEndpoint() {
 		// Connection test endpoint.
 		Spark.get(SERVICE_PATH + "/test", (req, res) -> {
-			LOGGER.info("Recived connection test from '" + req.host() + "'.");
+			LOGGER.info("Recived connection test from host '" + req.host() + "'.");
 
 			res.status(200);
 			res.type("text/plain");
