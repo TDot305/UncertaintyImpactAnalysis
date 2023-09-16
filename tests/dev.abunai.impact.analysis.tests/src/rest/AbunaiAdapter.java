@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiPredicate;
 
 import org.eclipse.emf.ecore.EObject;
@@ -164,11 +165,13 @@ public class AbunaiAdapter implements SecurityCheckAdapter {
 		for (var assumption : this.assumptions) {
 			for (var affectedEntityID : assumption.getAffectedEntities().stream()
 					.map(modelEntity -> modelEntity.getId()).toList()) {
-				EObject lookedUpElement = resourceProvider.lookupElementWithId(affectedEntityID);
+				Optional<EObject> potentialLookedUpElement = resourceProvider.lookupElementWithId(affectedEntityID);
 
-				if (lookedUpElement == null) {
+				if (potentialLookedUpElement.isEmpty()) {
 					continue;
 				}
+				
+				EObject lookedUpElement = potentialLookedUpElement.get();
 
 				if (lookedUpElement instanceof AssemblyContext) {
 					uncertaintySources.addComponentUncertaintyInAssemblyContext(affectedEntityID);
