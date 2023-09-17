@@ -29,14 +29,16 @@ public class AbunaiConnector extends RestConnector {
 
 	public static void main(String[] args) {
 		var restConnector = new AbunaiConnector();
-		restConnector.initEndpoints(2406);
+		restConnector.initEndpoints();
 	}
 
 	public AbunaiConnector() {
+		Spark.port(2406);
+		
 		this.objectMapper = new ObjectMapper();
 		this.abunaiAdapter = new AbunaiAdapter();
 
-		// Determine casestudies folder.
+		// Determine casestudies directory.
 		File potentialCaseStudiesDirectory = null;
 		var userDirFile = new File(System.getProperty("user.dir"));
 

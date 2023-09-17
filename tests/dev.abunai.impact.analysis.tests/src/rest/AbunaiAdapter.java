@@ -170,7 +170,7 @@ public class AbunaiAdapter implements SecurityCheckAdapter {
 				if (potentialLookedUpElement.isEmpty()) {
 					continue;
 				}
-				
+
 				EObject lookedUpElement = potentialLookedUpElement.get();
 
 				if (lookedUpElement instanceof AssemblyContext) {
